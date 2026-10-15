@@ -1,33 +1,76 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeConfig, DEFAULT_CONFIG } from '../src/config.js';
+import { normalizeConfig, parseDecimal, DEFAULT_CONFIG } from '../src/config.js';
 
-test('normalizeConfig returns the defaults when called with no argument', () => {
-  assert.deepEqual(normalizeConfig(), DEFAULT_CONFIG);
+test('normalizeConfig gives the defaults when called with no argument', () => {
+  const config = normalizeConfig();
+  assert.equal(config.method, 'mwl');
+  assert.equal(config.school, 'shafi');
+  assert.equal(config.high_latitude_rule, 'angle_based');
+  assert.equal(config.midnight_mode, 'auto');
+  assert.equal(config.language, 'fr');
+  assert.equal(config.imsak_minutes, 10);
+  assert.equal(config.custom_fajr_angle, 18);
+  assert.equal(config.custom_isha_angle, 17);
+  assert.equal(config.latitude, null);
+  assert.equal(config.adjust_fajr, 0);
+  assert.equal(DEFAULT_CONFIG.custom_fajr_angle, '18');
 });
 
-test('normalizeConfig keeps user values over the defaults', () => {
-  const config = normalizeConfig({ latitude: 45.5, longitude: -73.6, unit: 'fahrenheit' });
-  assert.equal(config.latitude, 45.5);
-  assert.equal(config.longitude, -73.6);
-  assert.equal(config.unit, 'fahrenheit');
+test('decimals typed by hand accept a comma, and nothing else', () => {
+  assert.equal(parseDecimal('48,8566'), 48.8566);
+  assert.equal(parseDecimal(' -0.1254 '), -0.1254);
+  assert.equal(parseDecimal(12), 12);
+  for (const bad of ['', '  ', 'abc', '48.8.5', '1e3', null, undefined, NaN]) {
+    assert.equal(parseDecimal(bad), null, String(bad));
+  }
 });
 
-test('normalizeConfig coerces numeric strings coming from a form', () => {
-  const config = normalizeConfig({ latitude: '48.8', longitude: '2.3', poll_frequency: '600' });
-  assert.equal(config.latitude, 48.8);
-  assert.equal(config.longitude, 2.3);
-  assert.equal(config.poll_frequency, 600);
-  assert.equal(typeof config.poll_frequency, 'number');
+test('coordinates: both or none, within range', () => {
+  assert.deepEqual(
+    [
+      normalizeConfig({ latitude: '48,85', longitude: '2,35' }).latitude,
+      normalizeConfig({ latitude: '48,85', longitude: '2,35' }).longitude,
+    ],
+    [48.85, 2.35],
+  );
+  assert.equal(normalizeConfig({ latitude: '48.85' }).latitude, null);
+  assert.equal(normalizeConfig({ latitude: '91', longitude: '2' }).latitude, null);
+  assert.equal(normalizeConfig({ latitude: '45', longitude: '-181' }).longitude, null);
 });
 
-test('normalizeConfig falls back to the default for a missing numeric field', () => {
-  const config = normalizeConfig({ unit: 'celsius' });
-  assert.equal(config.poll_frequency, DEFAULT_CONFIG.poll_frequency);
+test('unknown choices fall back to the defaults', () => {
+  const config = normalizeConfig({
+    method: 'moonsighting',
+    school: 'maliki',
+    high_latitude_rule: 'none',
+    midnight_mode: 'x',
+    language: 'it',
+  });
+  assert.equal(config.method, 'mwl');
+  assert.equal(config.school, 'shafi');
+  assert.equal(config.high_latitude_rule, 'angle_based');
+  assert.equal(config.midnight_mode, 'auto');
+  assert.equal(config.language, 'fr');
 });
 
-test('GLADYS_PREFER_LOCAL defaults to true and only an explicit false disables it', () => {
-  assert.equal(normalizeConfig().GLADYS_PREFER_LOCAL, true);
-  assert.equal(normalizeConfig({ GLADYS_PREFER_LOCAL: true }).GLADYS_PREFER_LOCAL, true);
-  assert.equal(normalizeConfig({ GLADYS_PREFER_LOCAL: false }).GLADYS_PREFER_LOCAL, false);
+test('minutes are integers within their bounds, strings from a form included', () => {
+  const config = normalizeConfig({
+    adjust_fajr: '5',
+    adjust_isha: -90,
+    adjust_dhuhr: 2.6,
+    imsak_minutes: '',
+    custom_isha_minutes: 500,
+  });
+  assert.equal(config.adjust_fajr, 5);
+  assert.equal(config.adjust_isha, -60);
+  assert.equal(config.adjust_dhuhr, 3);
+  assert.equal(config.imsak_minutes, 10);
+  assert.equal(config.custom_isha_minutes, 180);
+});
+
+test('custom angles: decimals with a comma, out of range falls back', () => {
+  const config = normalizeConfig({ custom_fajr_angle: '13,5', custom_isha_angle: '45' });
+  assert.equal(config.custom_fajr_angle, 13.5);
+  assert.equal(config.custom_isha_angle, 17);
 });

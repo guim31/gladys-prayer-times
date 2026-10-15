@@ -9,7 +9,10 @@ A Gladys Assistant **external integration**: a Node.js service (Node 22+, ESM,
 no build step) that runs in its own sandboxed Docker container and talks to
 Gladys through
 [`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
-its only runtime dependency. It started from the official JavaScript template.
+its only runtime dependency. It computes the Islamic prayer times of the house
+of Gladys locally (no network request), and exposes them as a device, scene
+triggers, a scene action and a dashboard widget. It started from the official
+JavaScript template.
 
 ## Commands
 
@@ -22,6 +25,7 @@ npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
 npx github:GladysAssistant/integration-store .   # store admission checks
+node scripts/probe.mjs <lat> <lon> [--tz Zone] [--date DD-MM-YYYY] [--save]   # live Aladhan comparison
 ```
 
 The CI (`.github/workflows/ci.yml`) runs `format:check`, `lint` and `test` on
@@ -31,16 +35,24 @@ pushing.
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+index.js                          SDK wiring only (src/app.js registers the handlers)
+src/app.js                        lifecycle, minute clock, states, scene events, actions, widget
+src/prayer/calc.js                the astronomical calculation (one civil date -> UTC instants)
+src/prayer/methods.js             calculation methods: angles, offsets, Aladhan equivalent
+src/prayer/schedule.js            time zone, civil dates, Hijri month, next prayer (snapshot)
+src/events.js                     scene events due in a (from, to] window
+src/device.js                     the device (fixed external_id) and its states
+src/location.js                   house of Gladys or typed coordinates
+src/widgets.js                    dashboard widget content (pure builder)
+src/scenes.js                     scene action outputs
+src/i18n.js                       every text, en/fr/de/es
+src/issues.js                     repeated failures logged once
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
+scripts/aladhan.mjs, probe.mjs    Aladhan request mapping and live comparison (dev only)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
+docs/{en,fr,de,es}.md             user documentation, re-hosted by Gladys (en, fr mandatory)
 test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+test/fixtures/aladhan/            real Aladhan answers; test/fixtures/official/ official tables
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -70,8 +82,10 @@ test/                             node --test, against the SDK's fake Gladys (in
   `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in four languages (English, French, German with
+  "du", Spanish with "usted"): action messages, manifest texts, feature names,
+  widget texts and `docs/{en,fr,de,es}.md` with the same sections, checked by
+  `test/i18n.test.js`.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +247,48 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## Horaires de prière : propre à cette intégration
+
+- **Aucun appel réseau dans le conteneur.** Le calcul est local
+  (`src/prayer/calc.js`), écrit d'après les formules publiées (PrayTimes.org,
+  repris par Aladhan) : ne pas le remplacer par un appel à Aladhan. `adhan`
+  (adhan-js, MIT) n'est qu'une dépendance de développement, référence des tests.
+- **Même minute qu'Aladhan** : `test/aladhan.test.js` rejoue de vraies réponses
+  (tests et documentation du service Aladhan) à la minute près. Le proxy des
+  sessions de code refuse `api.aladhan.com` : `node scripts/probe.mjs <lat> <lon>
+--save` enregistre d'autres réponses depuis une machine qui a le réseau
+  (coordonnées d'une ville, jamais d'une maison : dépôt public).
+- **Paramètres des méthodes** = ceux d'Aladhan (`aladhan.id`), sauf Turquie et
+  Dubaï qui portent en plus les décalages de leur autorité (adhan-js), vérifiés
+  sur les calendriers officiels. Aladhan ignore peut-être ces décalages pour ses
+  méthodes 13 et 16 : `probe.mjs` les envoie en `tune`. Les clés de méthode sont
+  stockées dans la config des utilisateurs : ne jamais en renommer une.
+- **Règle des hautes latitudes** : sémantique PrayTimes/Aladhan (l'horaire est
+  borné à une part de la nuit quand il s'en éloigne plus). adhan-js applique
+  « milieu de la nuit » autrement : il n'est comparé à adhan-js qu'en
+  « selon l'angle » et « un septième ».
+- **Fuseau** : celui du conteneur (`TZ`, posé par le superviseur Gladys). Chaque
+  date civile est calculée seule (jamais « + 24 h ») : les jours de changement
+  d'heure restent justes.
+- **Appareil** : `external_id` fixe (`prayer-times:home`), quelle que soit la
+  maison : changer de maison ou de méthode change les valeurs, pas l'appareil.
+  Pas de type « heure » dans Gladys : les horaires sont des `text/text`
+  (`HH:MM`), le temps restant un `duration/integer` en minutes, sans historique.
+- **Horloge** : un tick par minute, 250 ms après la minute, publie les états
+  (heartbeat 6 h), envoie les événements dont l'instant est dans
+  `(dernier tick, maintenant]` (au plus 2 min de retard, jamais au démarrage),
+  et relance le widget quand la prochaine prière change. L'identifiant d'un
+  événement est (date, horaire, décalage), pas l'instant : un horaire déplacé
+  par une nouvelle config n'est pas annoncé deux fois.
+- **Déclencheur « Prière à venir »** : les filtres de scène ne font qu'égalité,
+  donc un événement par décalage de `UPCOMING_OFFSETS` ; le champ
+  `minutes_before` est obligatoire (vide, il se déclencherait sept fois par
+  prière). Ajouter un décalage est sans risque, en retirer un casse des scènes.
+- **Parler sur une enceinte** (`music.play-notification`) lit un texte (TTS),
+  pas un fichier audio : l'adhan enregistré n'est pas jouable par le cœur seul.
+- **`source: "houses"`** exige `gladys_version >=5.2.0`. La maison choisie
+  n'apporte que son sélecteur : les coordonnées viennent de `getHouses()`, qui
+  exige `location: true` (relu toutes les 6 h, pas d'événement de mise à jour).
+- **Date hégirienne** : `Intl` avec le calendrier `islamic-umalqura` (ICU complet
+  de Node) ; elle décide aussi de l'Isha du Ramadan d'Umm al-Qura (120 min).

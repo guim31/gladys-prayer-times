@@ -1,41 +1,38 @@
 // -----------------------------------------------------------------------------
-// Scene actions (SDK v0.14+, Gladys 5.1+).
-//
-// A scene action is an OPERATION a scene author places in a scene, with
-// parameters and a result: "identify this device", "take a snapshot", "clean
-// these rooms". Each one is declared in the manifest `scene_actions` field
-// (key, label, `fields` in the config_schema grammar, scalar `outputs`) and
-// handled here, keyed by that same `key`; index.js registers every entry with
-// `gladys.onSceneAction(key, ...)`.
-//
-// Scene TRIGGERS are the other direction ("this happened"): they are fired by
-// the device that observes the event, see src/devices/motionSensor.js.
-//
-// The rules that matter:
-//   - `fields` arrive RESOLVED: scene variables substituted, defaults applied,
-//     validated by the core; a `"source": "devices"` field is the chosen
-//     device external_id;
-//   - resolve an object of the declared `outputs` (scalars only), readable by
-//     the following actions of the scene, or `undefined` for none. Keys not
-//     declared in the manifest are dropped by the core;
-//   - throwing fails THIS action only: the scene logs it and continues. A
-//     scene action is never a condition: return an output and let the scene
-//     author gate on it;
-//   - never fire a scene event as a consequence of a received action: a scene
-//     bound to that event would loop through the integration.
+// Scene action "Get the prayer times": today's or tomorrow's times as scene
+// variables, for a morning announcement ("Fajr at 06:12, Dhuhr at 13:47…") or
+// a message. Read-only: it changes nothing, so it fires no event either.
 // -----------------------------------------------------------------------------
 
-import { createLogger } from '@gladysassistant/integration-sdk';
-import { signalDevice } from './devices/index.js';
+import { TIME_NAMES } from './i18n.js';
+import {
+  SHOWN_TIMES,
+  addDays,
+  formatTime,
+  localDate,
+  snapshot,
+  timesForDate,
+} from './prayer/schedule.js';
 
-const logger = createLogger({ name: 'scenes' });
+// Scene action key, as declared in the manifest `scene_actions`: never renamed.
+export const SCENE_ACTION = { GET_TIMES: 'get_prayer_times' };
 
-export const SCENE_ACTIONS = {
-  // The ack is awaited under the action's `timeout_seconds` (15 s in the
-  // manifest), counted from the moment the scene reaches the action.
-  async identify_device(gladys, { fields, config }) {
-    logger.info(`Scene action identify_device <- ${fields.device}`);
-    const signalled = await signalDevice(gladys, fields.device, config);
-    return { signalled };
-  },
-};
+/**
+ * The outputs of `get_prayer_times` (declared in the manifest).
+ * @param {object} options
+ * @param {{ day?: string }} options.fields 'today' (default) or 'tomorrow'
+ */
+export function getTimesOutputs({ fields, config, location, now, timeZone }) {
+  const tomorrow = fields?.day === 'tomorrow';
+  const date = addDays(localDate(new Date(now), timeZone), tomorrow ? 1 : 0);
+  const times = timesForDate(config, location, date);
+  const outputs = {};
+  for (const key of SHOWN_TIMES) {
+    outputs[key] = times[key] ? formatTime(times[key], timeZone) : '';
+  }
+  const snap = snapshot(config, location, now, timeZone);
+  outputs.next_prayer = snap.next ? TIME_NAMES[config.language][snap.next.key] : '';
+  outputs.next_prayer_time = snap.next ? formatTime(snap.next.at, timeZone) : '';
+  outputs.minutes_to_next = snap.minutesToNext ?? 0;
+  return outputs;
+}

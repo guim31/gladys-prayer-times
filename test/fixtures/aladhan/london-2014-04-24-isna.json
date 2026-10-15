@@ -1,0 +1,22 @@
+{
+  "source": "Success response documented by Aladhan for http://api.aladhan.com/v1/timings/1398332113?latitude=51.508515&longitude=-0.1254872&method=2 (routes/timings/v1/prayerTimes.php, github.com/Arabicsource/aladhan-api); meta: Europe/London, ANGLE_BASED, STANDARD midnight, STANDARD school.",
+  "date": "24-04-2014",
+  "request": {
+    "latitude": 51.508515,
+    "longitude": -0.1254872,
+    "method": 2,
+    "latitudeAdjustmentMethod": 3,
+    "timezonestring": "Europe/London"
+  },
+  "timings": {
+    "Fajr": "03:57",
+    "Sunrise": "05:46",
+    "Dhuhr": "12:59",
+    "Asr": "16:55",
+    "Sunset": "20:12",
+    "Maghrib": "20:12",
+    "Isha": "22:02",
+    "Imsak": "03:47",
+    "Midnight": "00:59"
+  }
+}

@@ -1,177 +1,1237 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Prayer Times",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "The five daily prayer times for your home, computed locally, with adhan triggers.",
+    "fr": "Les cinq prières du jour pour votre maison, calculées localement, avec déclencheurs d'adhan.",
+    "de": "Die fünf täglichen Gebetszeiten für dein Zuhause, lokal berechnet, mit Adhan-Auslösern.",
+    "es": "Los cinco horarios de oración de su casa, calculados localmente, con disparadores de adhan."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "docker_image": "ghcr.io/guim31/gladys-prayer-times:1.0.0",
+  "gladys_version": ">=5.2.0",
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-prayer-times/main/cover.png",
+  "categories": ["services"],
+  "transports": ["local"],
+  "location": true,
   "config_schema": [
     {
-      "key": "intro",
+      "key": "location_section",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
-      "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+      "label": {
+        "en": "Location",
+        "fr": "Position",
+        "de": "Standort",
+        "es": "Ubicación"
       },
-      "links": [
+      "description": {
+        "en": "The times are computed for the house of Gladys (Settings → Houses), in the time zone of Gladys. Typed coordinates win over the house.",
+        "fr": "Les horaires sont calculés pour la maison de Gladys (Paramètres → Maisons), dans le fuseau horaire de Gladys. Des coordonnées saisies remplacent la maison.",
+        "de": "Die Zeiten werden für das Zuhause in Gladys berechnet (Einstellungen → Zuhause), in der Zeitzone von Gladys. Eingegebene Koordinaten haben Vorrang.",
+        "es": "Los horarios se calculan para la vivienda de Gladys (Configuración → Viviendas), en la zona horaria de Gladys. Las coordenadas introducidas tienen prioridad."
+      }
+    },
+    {
+      "key": "house",
+      "type": "select",
+      "source": "houses",
+      "label": {
+        "en": "House",
+        "fr": "Maison",
+        "de": "Zuhause",
+        "es": "Vivienda"
+      },
+      "description": {
+        "en": "Empty: the first house with coordinates.",
+        "fr": "Vide : la première maison qui a des coordonnées.",
+        "de": "Leer: das erste Zuhause mit Koordinaten.",
+        "es": "Vacío: la primera vivienda con coordenadas."
+      },
+      "required": false
+    },
+    {
+      "key": "latitude",
+      "type": "string",
+      "label": {
+        "en": "Latitude (optional)",
+        "fr": "Latitude (facultatif)",
+        "de": "Breitengrad (optional)",
+        "es": "Latitud (opcional)"
+      },
+      "description": {
+        "en": "Decimal degrees, north positive. With the longitude, replaces the house.",
+        "fr": "Degrés décimaux, nord positif. Avec la longitude, remplace la maison.",
+        "de": "Dezimalgrad, Norden positiv. Ersetzt mit dem Längengrad das Zuhause.",
+        "es": "Grados decimales, norte positivo. Con la longitud, sustituye la vivienda."
+      },
+      "placeholder": {
+        "en": "e.g. 48.8566",
+        "fr": "ex. 48,8566",
+        "de": "z. B. 48,8566",
+        "es": "p. ej. 48,8566"
+      },
+      "required": false
+    },
+    {
+      "key": "longitude",
+      "type": "string",
+      "label": {
+        "en": "Longitude (optional)",
+        "fr": "Longitude (facultatif)",
+        "de": "Längengrad (optional)",
+        "es": "Longitud (opcional)"
+      },
+      "description": {
+        "en": "Decimal degrees, east positive.",
+        "fr": "Degrés décimaux, est positif.",
+        "de": "Dezimalgrad, Osten positiv.",
+        "es": "Grados decimales, este positivo."
+      },
+      "placeholder": {
+        "en": "e.g. 2.3522",
+        "fr": "ex. 2,3522",
+        "de": "z. B. 2,3522",
+        "es": "p. ej. 2,3522"
+      },
+      "required": false
+    },
+    {
+      "key": "calculation_section",
+      "type": "section",
+      "label": {
+        "en": "Calculation",
+        "fr": "Calcul",
+        "de": "Berechnung",
+        "es": "Cálculo"
+      },
+      "description": {
+        "en": "Pick the method of your mosque or of your country. The angles are the sun depression below the horizon at Fajr and Isha.",
+        "fr": "Choisissez la méthode de votre mosquée ou de votre pays. Les angles sont l'abaissement du soleil sous l'horizon à Fajr et à Isha.",
+        "de": "Wähle die Methode deiner Moschee oder deines Landes. Die Winkel sind die Sonnentiefe unter dem Horizont bei Fajr und Isha.",
+        "es": "Elija el método de su mezquita o de su país. Los ángulos son la depresión del sol bajo el horizonte en Fajr e Isha."
+      }
+    },
+    {
+      "key": "method",
+      "type": "select",
+      "label": {
+        "en": "Calculation method",
+        "fr": "Méthode de calcul",
+        "de": "Berechnungsmethode",
+        "es": "Método de cálculo"
+      },
+      "required": false,
+      "default": "mwl",
+      "options": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "value": "mwl",
+          "label": {
+            "en": "Muslim World League (18° / 17°)",
+            "fr": "Ligue islamique mondiale (18° / 17°)",
+            "de": "Islamische Weltliga (18° / 17°)",
+            "es": "Liga Mundial Musulmana (18° / 17°)"
+          }
+        },
+        {
+          "value": "isna",
+          "label": {
+            "en": "ISNA, North America (15° / 15°)",
+            "fr": "ISNA, Amérique du Nord (15° / 15°)",
+            "de": "ISNA, Nordamerika (15° / 15°)",
+            "es": "ISNA, Norteamérica (15° / 15°)"
+          }
+        },
+        {
+          "value": "egypt",
+          "label": {
+            "en": "Egyptian Survey Authority (19.5° / 17.5°)",
+            "fr": "Autorité égyptienne (19,5° / 17,5°)",
+            "de": "Ägyptische Vermessungsbehörde (19,5° / 17,5°)",
+            "es": "Autoridad egipcia (19,5° / 17,5°)"
+          }
+        },
+        {
+          "value": "umm_al_qura",
+          "label": {
+            "en": "Umm al-Qura, Makkah (18.5° / 90 min)",
+            "fr": "Umm al-Qura, La Mecque (18,5° / 90 min)",
+            "de": "Umm al-Qura, Mekka (18,5° / 90 min)",
+            "es": "Umm al-Qura, La Meca (18,5° / 90 min)"
+          }
+        },
+        {
+          "value": "karachi",
+          "label": {
+            "en": "University of Karachi (18° / 18°)",
+            "fr": "Université de Karachi (18° / 18°)",
+            "de": "Universität Karatschi (18° / 18°)",
+            "es": "Universidad de Karachi (18° / 18°)"
+          }
+        },
+        {
+          "value": "uoif",
+          "label": {
+            "en": "France, UOIF (12° / 12°)",
+            "fr": "France, UOIF (12° / 12°)",
+            "de": "Frankreich, UOIF (12° / 12°)",
+            "es": "Francia, UOIF (12° / 12°)"
+          }
+        },
+        {
+          "value": "france_15",
+          "label": {
+            "en": "France, 15° / 15°",
+            "fr": "France, 15° / 15°",
+            "de": "Frankreich, 15° / 15°",
+            "es": "Francia, 15° / 15°"
+          }
+        },
+        {
+          "value": "france_18",
+          "label": {
+            "en": "France, 18° / 18°",
+            "fr": "France, 18° / 18°",
+            "de": "Frankreich, 18° / 18°",
+            "es": "Francia, 18° / 18°"
+          }
+        },
+        {
+          "value": "turkey",
+          "label": {
+            "en": "Turkey, Diyanet",
+            "fr": "Turquie, Diyanet",
+            "de": "Türkei, Diyanet",
+            "es": "Turquía, Diyanet"
+          }
+        },
+        {
+          "value": "dubai",
+          "label": {
+            "en": "Dubai, Awqaf (18.2°)",
+            "fr": "Dubaï, Awqaf (18,2°)",
+            "de": "Dubai, Awqaf (18,2°)",
+            "es": "Dubái, Awqaf (18,2°)"
+          }
+        },
+        {
+          "value": "gulf",
+          "label": {
+            "en": "Gulf region (19.5° / 90 min)",
+            "fr": "Région du Golfe (19,5° / 90 min)",
+            "de": "Golfregion (19,5° / 90 min)",
+            "es": "Región del Golfo (19,5° / 90 min)"
+          }
+        },
+        {
+          "value": "kuwait",
+          "label": {
+            "en": "Kuwait (18° / 17.5°)",
+            "fr": "Koweït (18° / 17,5°)",
+            "de": "Kuwait (18° / 17,5°)",
+            "es": "Kuwait (18° / 17,5°)"
+          }
+        },
+        {
+          "value": "qatar",
+          "label": {
+            "en": "Qatar (18° / 90 min)",
+            "fr": "Qatar (18° / 90 min)",
+            "de": "Katar (18° / 90 min)",
+            "es": "Catar (18° / 90 min)"
+          }
+        },
+        {
+          "value": "singapore",
+          "label": {
+            "en": "Singapore, MUIS (20° / 18°)",
+            "fr": "Singapour, MUIS (20° / 18°)",
+            "de": "Singapur, MUIS (20° / 18°)",
+            "es": "Singapur, MUIS (20° / 18°)"
+          }
+        },
+        {
+          "value": "jakim",
+          "label": {
+            "en": "Malaysia, JAKIM (20° / 18°)",
+            "fr": "Malaisie, JAKIM (20° / 18°)",
+            "de": "Malaysia, JAKIM (20° / 18°)",
+            "es": "Malasia, JAKIM (20° / 18°)"
+          }
+        },
+        {
+          "value": "kemenag",
+          "label": {
+            "en": "Indonesia, Kemenag (20° / 18°)",
+            "fr": "Indonésie, Kemenag (20° / 18°)",
+            "de": "Indonesien, Kemenag (20° / 18°)",
+            "es": "Indonesia, Kemenag (20° / 18°)"
+          }
+        },
+        {
+          "value": "tunisia",
+          "label": {
+            "en": "Tunisia (18° / 18°)",
+            "fr": "Tunisie (18° / 18°)",
+            "de": "Tunesien (18° / 18°)",
+            "es": "Túnez (18° / 18°)"
+          }
+        },
+        {
+          "value": "russia",
+          "label": {
+            "en": "Russia (16° / 15°)",
+            "fr": "Russie (16° / 15°)",
+            "de": "Russland (16° / 15°)",
+            "es": "Rusia (16° / 15°)"
+          }
+        },
+        {
+          "value": "tehran",
+          "label": {
+            "en": "University of Tehran (17.7° / 14°)",
+            "fr": "Université de Téhéran (17,7° / 14°)",
+            "de": "Universität Teheran (17,7° / 14°)",
+            "es": "Universidad de Teherán (17,7° / 14°)"
+          }
+        },
+        {
+          "value": "jafari",
+          "label": {
+            "en": "Shia Ithna Ashari, Qum (16° / 14°)",
+            "fr": "Chiite duodécimain, Qom (16° / 14°)",
+            "de": "Schiitisch, Ghom (16° / 14°)",
+            "es": "Chiita duodecimano, Qom (16° / 14°)"
+          }
+        },
+        {
+          "value": "custom",
+          "label": {
+            "en": "Custom angles",
+            "fr": "Angles personnalisés",
+            "de": "Eigene Winkel",
+            "es": "Ángulos personalizados"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "school",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
+      "label": {
+        "en": "Asr (school)",
+        "fr": "Asr (école)",
+        "de": "Asr (Rechtsschule)",
+        "es": "Asr (escuela)"
+      },
       "required": false,
-      "default": "celsius",
+      "default": "shafi",
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        {
+          "value": "shafi",
+          "label": {
+            "en": "Standard: Shafi'i, Maliki, Hanbali",
+            "fr": "Standard : chaféite, malékite, hanbalite",
+            "de": "Standard: schafiitisch, malikitisch, hanbalitisch",
+            "es": "Estándar: shafií, malikí, hanbalí"
+          }
+        },
+        {
+          "value": "hanafi",
+          "label": {
+            "en": "Hanafi (later Asr)",
+            "fr": "Hanafite (Asr plus tardif)",
+            "de": "Hanafitisch (späteres Asr)",
+            "es": "Hanafí (Asr más tardío)"
+          }
+        }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "key": "high_latitude_rule",
+      "type": "select",
+      "label": {
+        "en": "High latitudes",
+        "fr": "Hautes latitudes",
+        "de": "Hohe Breitengrade",
+        "es": "Latitudes altas"
+      },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "When the twilight lasts all night (in summer, north of about 48°), Fajr and Isha are bound to a portion of the night.",
+        "fr": "Quand le crépuscule dure toute la nuit (l'été, au nord d'environ 48°), Fajr et Isha sont bornés à une part de la nuit.",
+        "de": "Wenn die Dämmerung die ganze Nacht dauert (im Sommer, nördlich von etwa 48°), werden Fajr und Isha auf einen Teil der Nacht begrenzt.",
+        "es": "Cuando el crepúsculo dura toda la noche (en verano, al norte de unos 48°), Fajr e Isha se limitan a una parte de la noche."
       },
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "default": "angle_based",
+      "options": [
+        {
+          "value": "angle_based",
+          "label": {
+            "en": "Angle based (Aladhan default)",
+            "fr": "Selon l'angle (défaut d'Aladhan)",
+            "de": "Winkelbasiert (Aladhan-Standard)",
+            "es": "Según el ángulo (por defecto en Aladhan)"
+          }
+        },
+        {
+          "value": "middle_of_the_night",
+          "label": {
+            "en": "Middle of the night",
+            "fr": "Milieu de la nuit",
+            "de": "Mitte der Nacht",
+            "es": "Mitad de la noche"
+          }
+        },
+        {
+          "value": "one_seventh",
+          "label": {
+            "en": "One seventh of the night",
+            "fr": "Un septième de la nuit",
+            "de": "Ein Siebtel der Nacht",
+            "es": "Un séptimo de la noche"
+          }
+        }
+      ]
+    },
+    {
+      "key": "midnight_mode",
+      "type": "select",
+      "label": {
+        "en": "Midnight",
+        "fr": "Minuit",
+        "de": "Mitternacht",
+        "es": "Medianoche"
+      },
+      "required": false,
+      "default": "auto",
+      "options": [
+        {
+          "value": "auto",
+          "label": {
+            "en": "The method's",
+            "fr": "Celui de la méthode",
+            "de": "Wie die Methode",
+            "es": "El del método"
+          }
+        },
+        {
+          "value": "standard",
+          "label": {
+            "en": "Sunset to sunrise",
+            "fr": "Du coucher au lever du soleil",
+            "de": "Sonnenuntergang bis Sonnenaufgang",
+            "es": "Del ocaso a la salida del sol"
+          }
+        },
+        {
+          "value": "jafari",
+          "label": {
+            "en": "Sunset to Fajr (Jafari)",
+            "fr": "Du coucher du soleil à Fajr (jafarite)",
+            "de": "Sonnenuntergang bis Fajr (dschafaritisch)",
+            "es": "Del ocaso a Fajr (yafarí)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "custom_fajr_angle",
+      "type": "string",
+      "label": {
+        "en": "Custom method: Fajr angle (°)",
+        "fr": "Méthode personnalisée : angle de Fajr (°)",
+        "de": "Eigene Methode: Fajr-Winkel (°)",
+        "es": "Método personalizado: ángulo de Fajr (°)"
+      },
+      "placeholder": {
+        "en": "e.g. 18",
+        "fr": "ex. 18",
+        "de": "z. B. 18",
+        "es": "p. ej. 18"
+      },
+      "required": false,
+      "default": "18"
+    },
+    {
+      "key": "custom_isha_angle",
+      "type": "string",
+      "label": {
+        "en": "Custom method: Isha angle (°)",
+        "fr": "Méthode personnalisée : angle d’Isha (°)",
+        "de": "Eigene Methode: Isha-Winkel (°)",
+        "es": "Método personalizado: ángulo de Isha (°)"
+      },
+      "placeholder": {
+        "en": "e.g. 17",
+        "fr": "ex. 17",
+        "de": "z. B. 17",
+        "es": "p. ej. 17"
+      },
+      "required": false,
+      "default": "17"
+    },
+    {
+      "key": "custom_isha_minutes",
+      "type": "number",
+      "label": {
+        "en": "Custom method: Isha, minutes after Maghrib",
+        "fr": "Méthode personnalisée : Isha, minutes après Maghrib",
+        "de": "Eigene Methode: Isha, Minuten nach Maghrib",
+        "es": "Método personalizado: Isha, minutos tras Maghrib"
+      },
+      "description": {
+        "en": "0: use the Isha angle.",
+        "fr": "0 : utiliser l'angle d'Isha.",
+        "de": "0: den Isha-Winkel verwenden.",
+        "es": "0: usar el ángulo de Isha."
+      },
+      "required": false,
+      "default": 0,
+      "min": 0,
+      "max": 180
+    },
+    {
+      "key": "adjustments_section",
+      "type": "section",
+      "label": {
+        "en": "Adjustments",
+        "fr": "Ajustements",
+        "de": "Anpassungen",
+        "es": "Ajustes"
+      },
+      "description": {
+        "en": "Minutes added to a computed time, to match the timetable of your mosque (negative: earlier).",
+        "fr": "Minutes ajoutées à un horaire calculé, pour suivre le calendrier de votre mosquée (négatif : plus tôt).",
+        "de": "Minuten, die zu einer berechneten Zeit addiert werden, um dem Plan deiner Moschee zu folgen (negativ: früher).",
+        "es": "Minutos añadidos a una hora calculada, para seguir el horario de su mezquita (negativo: antes)."
+      }
+    },
+    {
+      "key": "imsak_minutes",
+      "type": "number",
+      "label": {
+        "en": "Imsak: minutes before Fajr",
+        "fr": "Imsak : minutes avant Fajr",
+        "de": "Imsak: Minuten vor Fajr",
+        "es": "Imsak: minutos antes de Fajr"
+      },
+      "required": false,
+      "default": 10,
+      "min": 0,
+      "max": 60
+    },
+    {
+      "key": "adjust_fajr",
+      "type": "number",
+      "label": {
+        "en": "Fajr (min)",
+        "fr": "Fajr (min)",
+        "de": "Fajr (min)",
+        "es": "Fajr (min)"
+      },
+      "required": false,
+      "default": 0,
+      "min": -60,
+      "max": 60
+    },
+    {
+      "key": "adjust_sunrise",
+      "type": "number",
+      "label": {
+        "en": "Sunrise (min)",
+        "fr": "Lever du soleil (min)",
+        "de": "Sonnenaufgang (min)",
+        "es": "Salida del sol (min)"
+      },
+      "required": false,
+      "default": 0,
+      "min": -60,
+      "max": 60
+    },
+    {
+      "key": "adjust_dhuhr",
+      "type": "number",
+      "label": {
+        "en": "Dhuhr (min)",
+        "fr": "Dhuhr (min)",
+        "de": "Dhuhr (min)",
+        "es": "Dhuhr (min)"
+      },
+      "required": false,
+      "default": 0,
+      "min": -60,
+      "max": 60
+    },
+    {
+      "key": "adjust_asr",
+      "type": "number",
+      "label": {
+        "en": "Asr (min)",
+        "fr": "Asr (min)",
+        "de": "Asr (min)",
+        "es": "Asr (min)"
+      },
+      "required": false,
+      "default": 0,
+      "min": -60,
+      "max": 60
+    },
+    {
+      "key": "adjust_maghrib",
+      "type": "number",
+      "label": {
+        "en": "Maghrib (min)",
+        "fr": "Maghrib (min)",
+        "de": "Maghrib (min)",
+        "es": "Maghrib (min)"
+      },
+      "required": false,
+      "default": 0,
+      "min": -60,
+      "max": 60
+    },
+    {
+      "key": "adjust_isha",
+      "type": "number",
+      "label": {
+        "en": "Isha (min)",
+        "fr": "Isha (min)",
+        "de": "Isha (min)",
+        "es": "Isha (min)"
+      },
+      "required": false,
+      "default": 0,
+      "min": -60,
+      "max": 60
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of the names",
+        "fr": "Langue des noms",
+        "de": "Sprache der Namen",
+        "es": "Idioma de los nombres"
+      },
+      "description": {
+        "en": "Names of the device features (set when the device is added) and of the scene variables.",
+        "fr": "Noms des fonctionnalités de l'appareil (fixés à son ajout) et des variables de scène.",
+        "de": "Namen der Gerätefunktionen (beim Hinzufügen festgelegt) und der Szenenvariablen.",
+        "es": "Nombres de las funciones del dispositivo (fijados al añadirlo) y de las variables de escena."
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
+        {
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
+        }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
-    },
-    {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
+      "key": "show_times",
+      "label": {
+        "en": "Show today's times",
+        "fr": "Afficher les horaires du jour",
+        "de": "Heutige Zeiten anzeigen",
+        "es": "Mostrar los horarios de hoy"
+      },
+      "timeout_seconds": 10
     }
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "prayer_time",
+      "label": {
+        "en": "Prayer time",
+        "fr": "Heure de la prière",
+        "de": "Gebetszeit",
+        "es": "Hora de la oración"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "Fires at the minute of a prayer (or Imsak, sunrise, midnight): start the adhan.",
+        "fr": "Se déclenche à la minute d'une prière (ou de l'imsak, du lever, de minuit) : lancez l'adhan.",
+        "de": "Löst zur Minute eines Gebets aus (oder Imsak, Sonnenaufgang, Mitternacht): starte den Adhan.",
+        "es": "Se activa en el minuto de una oración (o imsak, salida del sol, medianoche): inicie el adhan."
       },
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
+          "key": "prayer",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "label": {
+            "en": "Prayers",
+            "fr": "Prières",
+            "de": "Gebete",
+            "es": "Oraciones"
+          },
+          "description": {
+            "en": "Empty: every time of the list.",
+            "fr": "Vide : tous les horaires de la liste.",
+            "de": "Leer: alle Zeiten der Liste.",
+            "es": "Vacío: todas las horas de la lista."
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "imsak",
+              "label": {
+                "en": "Imsak",
+                "fr": "Imsak",
+                "de": "Imsak",
+                "es": "Imsak"
+              }
+            },
+            {
+              "value": "fajr",
+              "label": {
+                "en": "Fajr",
+                "fr": "Fajr",
+                "de": "Fajr",
+                "es": "Fajr"
+              }
+            },
+            {
+              "value": "sunrise",
+              "label": {
+                "en": "Sunrise",
+                "fr": "Lever du soleil",
+                "de": "Sonnenaufgang",
+                "es": "Salida del sol"
+              }
+            },
+            {
+              "value": "dhuhr",
+              "label": {
+                "en": "Dhuhr",
+                "fr": "Dhuhr",
+                "de": "Dhuhr",
+                "es": "Dhuhr"
+              }
+            },
+            {
+              "value": "asr",
+              "label": {
+                "en": "Asr",
+                "fr": "Asr",
+                "de": "Asr",
+                "es": "Asr"
+              }
+            },
+            {
+              "value": "maghrib",
+              "label": {
+                "en": "Maghrib",
+                "fr": "Maghrib",
+                "de": "Maghrib",
+                "es": "Maghrib"
+              }
+            },
+            {
+              "value": "isha",
+              "label": {
+                "en": "Isha",
+                "fr": "Isha",
+                "de": "Isha",
+                "es": "Isha"
+              }
+            },
+            {
+              "value": "midnight",
+              "label": {
+                "en": "Midnight",
+                "fr": "Minuit",
+                "de": "Mitternacht",
+                "es": "Medianoche"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "prayer",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Time (key)",
+            "fr": "Horaire (clé)",
+            "de": "Zeit (Schlüssel)",
+            "es": "Hora (clave)"
+          },
+          "description": {
+            "en": "fajr, sunrise, dhuhr, asr, maghrib, isha, imsak or midnight.",
+            "fr": "fajr, sunrise, dhuhr, asr, maghrib, isha, imsak ou midnight.",
+            "de": "fajr, sunrise, dhuhr, asr, maghrib, isha, imsak oder midnight.",
+            "es": "fajr, sunrise, dhuhr, asr, maghrib, isha, imsak o midnight."
+          }
+        },
+        {
+          "key": "prayer_name",
+          "type": "string",
+          "label": {
+            "en": "Prayer name",
+            "fr": "Nom de la prière",
+            "de": "Name des Gebets",
+            "es": "Nombre de la oración"
+          }
+        },
+        {
+          "key": "time",
+          "type": "string",
+          "label": {
+            "en": "Time (HH:MM)",
+            "fr": "Heure (HH:MM)",
+            "de": "Uhrzeit (HH:MM)",
+            "es": "Hora (HH:MM)"
+          }
+        }
+      ]
+    },
+    {
+      "key": "prayer_upcoming",
+      "label": {
+        "en": "Prayer coming up",
+        "fr": "Prière à venir",
+        "de": "Gebet steht bevor",
+        "es": "Oración próxima"
+      },
+      "description": {
+        "en": "Fires a chosen number of minutes before a prayer.",
+        "fr": "Se déclenche un nombre de minutes choisi avant une prière.",
+        "de": "Löst eine gewählte Anzahl Minuten vor einem Gebet aus.",
+        "es": "Se activa un número de minutos elegido antes de una oración."
+      },
+      "fields": [
+        {
+          "key": "prayer",
+          "type": "multi_select",
+          "label": {
+            "en": "Prayers",
+            "fr": "Prières",
+            "de": "Gebete",
+            "es": "Oraciones"
+          },
+          "description": {
+            "en": "Empty: every time of the list.",
+            "fr": "Vide : tous les horaires de la liste.",
+            "de": "Leer: alle Zeiten der Liste.",
+            "es": "Vacío: todas las horas de la lista."
+          },
+          "options": [
+            {
+              "value": "imsak",
+              "label": {
+                "en": "Imsak",
+                "fr": "Imsak",
+                "de": "Imsak",
+                "es": "Imsak"
+              }
+            },
+            {
+              "value": "fajr",
+              "label": {
+                "en": "Fajr",
+                "fr": "Fajr",
+                "de": "Fajr",
+                "es": "Fajr"
+              }
+            },
+            {
+              "value": "sunrise",
+              "label": {
+                "en": "Sunrise",
+                "fr": "Lever du soleil",
+                "de": "Sonnenaufgang",
+                "es": "Salida del sol"
+              }
+            },
+            {
+              "value": "dhuhr",
+              "label": {
+                "en": "Dhuhr",
+                "fr": "Dhuhr",
+                "de": "Dhuhr",
+                "es": "Dhuhr"
+              }
+            },
+            {
+              "value": "asr",
+              "label": {
+                "en": "Asr",
+                "fr": "Asr",
+                "de": "Asr",
+                "es": "Asr"
+              }
+            },
+            {
+              "value": "maghrib",
+              "label": {
+                "en": "Maghrib",
+                "fr": "Maghrib",
+                "de": "Maghrib",
+                "es": "Maghrib"
+              }
+            },
+            {
+              "value": "isha",
+              "label": {
+                "en": "Isha",
+                "fr": "Isha",
+                "de": "Isha",
+                "es": "Isha"
+              }
+            },
+            {
+              "value": "midnight",
+              "label": {
+                "en": "Midnight",
+                "fr": "Minuit",
+                "de": "Mitternacht",
+                "es": "Medianoche"
+              }
+            }
+          ]
+        },
+        {
+          "key": "minutes_before",
+          "type": "select",
+          "required": true,
+          "label": {
+            "en": "Minutes before",
+            "fr": "Minutes avant",
+            "de": "Minuten vorher",
+            "es": "Minutos antes"
+          },
+          "options": [
+            {
+              "value": "5",
+              "label": {
+                "en": "5 min",
+                "fr": "5 min",
+                "de": "5 min",
+                "es": "5 min"
+              }
+            },
+            {
+              "value": "10",
+              "label": {
+                "en": "10 min",
+                "fr": "10 min",
+                "de": "10 min",
+                "es": "10 min"
+              }
+            },
+            {
+              "value": "15",
+              "label": {
+                "en": "15 min",
+                "fr": "15 min",
+                "de": "15 min",
+                "es": "15 min"
+              }
+            },
+            {
+              "value": "20",
+              "label": {
+                "en": "20 min",
+                "fr": "20 min",
+                "de": "20 min",
+                "es": "20 min"
+              }
+            },
+            {
+              "value": "30",
+              "label": {
+                "en": "30 min",
+                "fr": "30 min",
+                "de": "30 min",
+                "es": "30 min"
+              }
+            },
+            {
+              "value": "45",
+              "label": {
+                "en": "45 min",
+                "fr": "45 min",
+                "de": "45 min",
+                "es": "45 min"
+              }
+            },
+            {
+              "value": "60",
+              "label": {
+                "en": "60 min",
+                "fr": "60 min",
+                "de": "60 min",
+                "es": "60 min"
+              }
+            }
+          ]
+        }
+      ],
+      "variables": [
+        {
+          "key": "prayer",
+          "type": "string",
+          "label": {
+            "en": "Time (key)",
+            "fr": "Horaire (clé)",
+            "de": "Zeit (Schlüssel)",
+            "es": "Hora (clave)"
+          },
+          "description": {
+            "en": "fajr, sunrise, dhuhr, asr, maghrib, isha, imsak or midnight.",
+            "fr": "fajr, sunrise, dhuhr, asr, maghrib, isha, imsak ou midnight.",
+            "de": "fajr, sunrise, dhuhr, asr, maghrib, isha, imsak oder midnight.",
+            "es": "fajr, sunrise, dhuhr, asr, maghrib, isha, imsak o midnight."
+          }
+        },
+        {
+          "key": "prayer_name",
+          "type": "string",
+          "label": {
+            "en": "Prayer name",
+            "fr": "Nom de la prière",
+            "de": "Name des Gebets",
+            "es": "Nombre de la oración"
+          }
+        },
+        {
+          "key": "time",
+          "type": "string",
+          "label": {
+            "en": "Time (HH:MM)",
+            "fr": "Heure (HH:MM)",
+            "de": "Uhrzeit (HH:MM)",
+            "es": "Hora (HH:MM)"
+          }
+        },
+        {
+          "key": "minutes_before",
+          "type": "number",
+          "label": {
+            "en": "Minutes before",
+            "fr": "Minutes avant",
+            "de": "Minuten vorher",
+            "es": "Minutos antes"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "get_prayer_times",
+      "label": {
+        "en": "Get the prayer times",
+        "fr": "Lire les horaires de prière",
+        "de": "Gebetszeiten abrufen",
+        "es": "Obtener los horarios de oración"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Today's or tomorrow's times, and the next prayer, for the next actions.",
+        "fr": "Les horaires du jour ou du lendemain, et la prochaine prière, pour les actions suivantes.",
+        "de": "Die Zeiten von heute oder morgen und das nächste Gebet, für die folgenden Aktionen.",
+        "es": "Los horarios de hoy o de mañana, y la próxima oración, para las acciones siguientes."
+      },
+      "timeout_seconds": 10,
       "fields": [
         {
-          "key": "device",
+          "key": "day",
           "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
+          "required": false,
+          "default": "today",
+          "label": {
+            "en": "Day",
+            "fr": "Jour",
+            "de": "Tag",
+            "es": "Día"
+          },
+          "options": [
+            {
+              "value": "today",
+              "label": {
+                "en": "Today",
+                "fr": "Aujourd'hui",
+                "de": "Heute",
+                "es": "Hoy"
+              }
+            },
+            {
+              "value": "tomorrow",
+              "label": {
+                "en": "Tomorrow",
+                "fr": "Demain",
+                "de": "Morgen",
+                "es": "Mañana"
+              }
+            }
+          ]
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "imsak",
+          "type": "string",
+          "label": {
+            "en": "Imsak",
+            "fr": "Imsak",
+            "de": "Imsak",
+            "es": "Imsak"
+          }
+        },
+        {
+          "key": "fajr",
+          "type": "string",
+          "label": {
+            "en": "Fajr",
+            "fr": "Fajr",
+            "de": "Fajr",
+            "es": "Fajr"
+          }
+        },
+        {
+          "key": "sunrise",
+          "type": "string",
+          "label": {
+            "en": "Sunrise",
+            "fr": "Lever du soleil",
+            "de": "Sonnenaufgang",
+            "es": "Salida del sol"
+          }
+        },
+        {
+          "key": "dhuhr",
+          "type": "string",
+          "label": {
+            "en": "Dhuhr",
+            "fr": "Dhuhr",
+            "de": "Dhuhr",
+            "es": "Dhuhr"
+          }
+        },
+        {
+          "key": "asr",
+          "type": "string",
+          "label": {
+            "en": "Asr",
+            "fr": "Asr",
+            "de": "Asr",
+            "es": "Asr"
+          }
+        },
+        {
+          "key": "maghrib",
+          "type": "string",
+          "label": {
+            "en": "Maghrib",
+            "fr": "Maghrib",
+            "de": "Maghrib",
+            "es": "Maghrib"
+          }
+        },
+        {
+          "key": "isha",
+          "type": "string",
+          "label": {
+            "en": "Isha",
+            "fr": "Isha",
+            "de": "Isha",
+            "es": "Isha"
+          }
+        },
+        {
+          "key": "midnight",
+          "type": "string",
+          "label": {
+            "en": "Midnight",
+            "fr": "Minuit",
+            "de": "Mitternacht",
+            "es": "Medianoche"
+          }
+        },
+        {
+          "key": "next_prayer",
+          "type": "string",
+          "label": {
+            "en": "Next prayer",
+            "fr": "Prochaine prière",
+            "de": "Nächstes Gebet",
+            "es": "Próxima oración"
+          }
+        },
+        {
+          "key": "next_prayer_time",
+          "type": "string",
+          "label": {
+            "en": "Next prayer time",
+            "fr": "Heure de la prochaine prière",
+            "de": "Uhrzeit des nächsten Gebets",
+            "es": "Hora de la próxima oración"
+          }
+        },
+        {
+          "key": "minutes_to_next",
+          "type": "number",
+          "label": {
+            "en": "Minutes to next prayer",
+            "fr": "Minutes avant la prochaine",
+            "de": "Minuten bis zum nächsten",
+            "es": "Minutos hasta la próxima"
+          }
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "prayer_times",
+      "label": {
+        "en": "Prayer times",
+        "fr": "Horaires de prière",
+        "de": "Gebetszeiten",
+        "es": "Horarios de oración"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Today's times, the next prayer and the time left before it.",
+        "fr": "Les horaires du jour, la prochaine prière et le temps restant.",
+        "de": "Die heutigen Zeiten, das nächste Gebet und die verbleibende Zeit.",
+        "es": "Los horarios de hoy, la próxima oración y el tiempo restante."
+      },
+      "icon": "clock"
     }
   ]
 }
