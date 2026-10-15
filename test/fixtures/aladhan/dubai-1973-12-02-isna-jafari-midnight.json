@@ -1,0 +1,12 @@
+{
+  "source": "Assertions of Aladhan's own API tests (tests/Api/TimingsTest.php, testJafariMidnightMode, github.com/Arabicsource/aladhan-api, 2018). Only the asserted times are recorded.",
+  "date": "02-12-1973",
+  "request": {
+    "latitude": 25.2048493,
+    "longitude": 55.2707828,
+    "method": 2,
+    "midnightMode": 1,
+    "timezonestring": "Asia/Dubai"
+  },
+  "timings": { "Fajr": "05:41", "Isha": "18:36", "Midnight": "23:35" }
+}

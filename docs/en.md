@@ -1,61 +1,188 @@
-# Demo Devices Template
+# Prayer Times
 
-This is the user documentation of the integration. Gladys re-hosts this file
-and shows a permanent **Documentation** link to it in the Configuration screen
-(in the user's language, with English as the fallback) — it is when
-configuring that the user needs it most. Keep the short onboarding hints in
-the `section` blocks of the manifest `config_schema`; put the long
-step-by-step (screenshots, troubleshooting…) here.
+The times of the five daily prayers (Fajr, Dhuhr, Asr, Maghrib, Isha), plus
+Imsak, sunrise and midnight, computed for your home — like the Home Assistant
+`islamic_prayer_times` integration. Gladys can show them on the dashboard and
+start a scene at the time of a prayer, or a few minutes before.
 
-## What you get
+The times are **computed locally**, from the position of the sun: no account,
+no Internet connection, nothing sent anywhere. The calculation is the one of
+the public [Aladhan](https://aladhan.com) API (the service Home Assistant
+calls), and gives the same minute.
 
-Six demo devices show up after installation: a weather station (real data
-from Open-Meteo), a switch, a dimmable light, a smart plug with power
-metering, a motion sensor and a camera.
+> **Developed without a real Gladys instance: feedback welcome.** The
+> integration was built against Gladys' test double and checked against real
+> Aladhan answers and official timetables, not on a running Gladys. If
+> something does not behave as described, please say so on the
+> [Gladys forum](https://community.gladysassistant.com) or in the
+> [issues](https://github.com/guim31/gladys-prayer-times/issues).
+
+## What you need
+
+- Gladys Assistant 5.2.0 or later.
+- The coordinates of your house in Gladys (_Settings_ → _Houses_), or
+  coordinates typed in the configuration of the integration.
+- The right time zone in Gladys: the times are shown in it.
+
+At install, Gladys asks to let the integration read the location of your
+houses: accept, it is how it knows where the sun is for you. The coordinates
+never leave your Gladys and are never written in the logs.
 
 ## Configuration
 
-1. Open the **Configuration** tab of the integration.
-2. Set the **latitude** and **longitude** the demo weather station should
-   observe (they default to Paris), and pick your temperature unit.
-   The **refresh interval** sets how often the weather station and the
-   plug's power are read: every 5 minutes by default, every minute at most.
-3. Save: the devices appear in the **Discovery** tab, ready to be added.
+### Location
 
-The **Prefer the local connection** toggle drives the demo plug: it reports
-the channel it actually uses as a badge (local or cloud), with an orange dot
-when it runs degraded (local refused, cloud fallback).
+- **House**: the house to compute for. Empty: the first house that has
+  coordinates.
+- **Latitude / Longitude** (optional): decimal degrees, a comma or a dot (for
+  example `48,8566` and `2,3522`). When both are filled, they replace the
+  house.
 
-## Actions
+### Calculation method
 
-- **Test the weather provider** — performs a live request to Open-Meteo and
-  shows the current temperature and humidity under the button.
-- **Identify a device** — pick one of your devices in the list and it will
-  signal itself (the demo light "blinks" in the logs).
+Pick the method of your mosque or of your country. The angles are how far the
+sun is below the horizon at Fajr and at Isha: the larger the angle, the
+earlier Fajr and the later Isha.
 
-## Scenes
+| Method                        | Fajr  | Isha             | Notes                                        |
+| ----------------------------- | ----- | ---------------- | -------------------------------------------- |
+| Muslim World League (default) | 18°   | 17°              | Europe, Far East, much of the US             |
+| ISNA, North America           | 15°   | 15°              |                                              |
+| Egyptian Survey Authority     | 19.5° | 17.5°            | Africa, Syria, Lebanon                       |
+| Umm al-Qura, Makkah           | 18.5° | 90 min           | 120 min during Ramadan                       |
+| University of Karachi         | 18°   | 18°              | Pakistan, India, Bangladesh                  |
+| France, UOIF                  | 12°   | 12°              | Union des organisations islamiques de France |
+| France, 15°                   | 15°   | 15°              |                                              |
+| France, 18°                   | 18°   | 18°              | as used by many mosques in France            |
+| Turkey, Diyanet               | 18°   | 17°              | with the Diyanet offsets                     |
+| Dubai, Awqaf                  | 18.2° | 18.2°            | with the Awqaf offsets                       |
+| Gulf region                   | 19.5° | 90 min           |                                              |
+| Kuwait                        | 18°   | 17.5°            |                                              |
+| Qatar                         | 18°   | 90 min           |                                              |
+| Singapore, MUIS               | 20°   | 18°              |                                              |
+| Malaysia, JAKIM               | 20°   | 18°              |                                              |
+| Indonesia, Kemenag            | 20°   | 18°              |                                              |
+| Tunisia                       | 18°   | 18°              |                                              |
+| Russia                        | 16°   | 15°              |                                              |
+| University of Tehran          | 17.7° | 14°              | Maghrib 4.5°, Jafari midnight                |
+| Shia Ithna Ashari, Qum        | 16°   | 14°              | Maghrib 4°, Jafari midnight                  |
+| Custom angles                 | yours | yours or minutes |                                              |
 
-The integration adds its own cards to the scene editor (Gladys 5.1 or
-later), under the **Integrations** category:
+- **Asr (school)**: _Standard_ (Shafi'i, Maliki, Hanbali: shadow equal to the
+  object) or _Hanafi_ (shadow twice the object, about an hour later).
+- **High latitudes**: in summer, north of about 48° (Paris, Lille, Brussels,
+  London…), the sky never gets dark enough for an 18° Fajr: the time is then
+  bound to a portion of the night. _Angle based_ (the default, as on
+  Aladhan), _Middle of the night_ or _One seventh of the night_.
+- **Midnight**: halfway from sunset to sunrise, or to Fajr (Jafari). By
+  default, the convention of the method.
+- **Custom method**: the Fajr and Isha angles (decimals accepted), or Isha a
+  number of minutes after Maghrib (0 keeps the angle).
 
-- **Motion detected** (trigger) — starts the scene when a demo motion sensor
-  sees something move. Optionally pick the sensor and what moved (person,
-  animal); left empty, any detection matches. The following actions can
-  read what moved with `{{triggerEvent.data.target}}`.
-- **Identify a device** (action) — makes the chosen device signal itself.
-  It returns whether the device could signal itself, so the following
-  actions can depend on it.
+### Adjustments
 
-## Dashboard
+Minutes added to each computed time, to match the timetable of your mosque
+exactly (negative: earlier), from -60 to +60. **Imsak** is a number of minutes
+before Fajr (10 by default), counted from the adjusted Fajr.
 
-Add the **Demo status** widget to a dashboard: it shows the live
-temperature of the weather station and the power of the office plug, the
-connection the plug currently uses (orange when degraded) and the observed
-location. Its **Identify the light** button makes the demo light signal
-itself.
+**Language of the names** sets the names of the device features (they are
+frozen when the device is added) and the prayer names sent to the scenes.
+
+## The device
+
+Add it from the **Discovery** tab. One device, **Prayer times**, with:
+
+| Feature                                                   | Value                                         |
+| --------------------------------------------------------- | --------------------------------------------- |
+| Imsak, Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha, Midnight | today's time, `HH:MM`                         |
+| Next prayer                                               | the name of the next of the five prayers      |
+| Next prayer time                                          | its time, `HH:MM`                             |
+| Time to next prayer                                       | in minutes, updated every minute (no history) |
+
+After Isha, the next prayer is tomorrow's Fajr. Sunrise, Imsak and midnight
+are shown but are not prayers. The integration refreshes the device every
+minute by itself.
+
+## Dashboard widget
+
+**Prayer times** (in _Dashboard_ → _Edit_ → _Add a widget_): the next prayer
+and its time, the time left, the eight times of the day (past ones greyed out,
+the next one with a bell), the Hijri date (Umm al-Qura calendar) and the
+method in use. It follows the language of the dashboard.
+
+## Scene triggers
+
+- **Prayer time**: fires at the minute of a prayer. Filter: the times to
+  react to (empty: all eight, including Imsak, sunrise and midnight).
+- **Prayer coming up**: fires a chosen number of minutes before (5, 10, 15,
+  20, 30, 45 or 60). Filters: the times, and the number of minutes
+  (required).
+
+Both give the scene: the time key (`fajr`…), the **prayer name** in the
+configured language, the **time** (`HH:MM`), and for the second one the
+**minutes before**.
+
+A restart of Gladys or of the integration never replays a past prayer; a
+time moved by a new configuration is not announced twice the same day.
+
+## Scene action
+
+**Get the prayer times**: today's or tomorrow's eight times, the next prayer,
+its time and the minutes left, readable by the following actions of the scene.
+
+## Configuration action
+
+**Show today's times**, in the configuration screen: the method in use and
+the eight times of today, to compare with your mosque's timetable before
+adding scenes.
+
+## Scene examples
+
+- **Adhan reminder**: trigger _Prayer time_ (Fajr, Dhuhr, Asr, Maghrib,
+  Isha), action _Talk on a speaker_ with the text “It is time for
+  {{prayer name}}”.
+- **Get ready**: trigger _Prayer coming up_, 15 minutes, Maghrib: light the
+  living room, send a message “Maghrib at {{time}}”.
+- **Ramadan**: trigger _Prayer coming up_, 30 minutes, Imsak: a message to
+  every phone for the last meal before dawn.
+- **Morning summary**: at 7:00, action _Get the prayer times_, then _Send a
+  message_ with the times of the day.
+
+## How the times are computed
+
+The sun's declination and the equation of time give the solar noon (Dhuhr);
+the hour angle at which the sun reaches a given depression below the horizon
+gives Fajr and Isha, -0.833° (refraction and the solar disk) gives sunrise and
+sunset, and the length of a shadow gives Asr. The results are rounded to the
+nearest minute. The tests of the integration check them against real Aladhan
+answers (same minute), the official timetables of Turkey, Qatar, Dubai,
+Kuwait, Makkah, Singapore and Tehran, and the adhan-js library.
+
+Nothing is fetched: the integration makes no network request at all.
 
 ## Troubleshooting
 
-The integration logs everything it does: check the integration logs from the
-Gladys UI (or `docker logs` on the host) with `LOG_LEVEL=debug` for the full
-detail.
+- **The status says “No location”**: give your house coordinates in
+  _Settings_ → _Houses_, or type them in the configuration, then save.
+- **Every time is one or two hours off**: the time zone of Gladys is wrong
+  (_Settings_ → _System_).
+- **A few minutes off from your mosque**: check the method and the Asr school
+  with _Show today's times_, then use the adjustments.
+- **The scene did not start**: check the filters of the trigger (for _Prayer
+  coming up_, the number of minutes is required) and that the integration is
+  running. Set `LOG_LEVEL=debug` to see every event fired in the logs.
+- **The feature names are in the wrong language**: they are frozen when the
+  device is added: change the language, delete the device and add it again.
+
+## Limits
+
+- No “Moonsighting Committee” method (seasonal angles) yet.
+- Within the polar circles, on days without sunrise or sunset, these times
+  stay empty.
+- _Talk on a speaker_ reads a text: playing a recorded adhan needs a speaker
+  integration that plays an audio file.
+- The Hijri date is the Umm al-Qura calendar, which may differ by a day from
+  the local moon sighting; it also decides when Umm al-Qura's Ramadan Isha
+  (120 min) applies.
+- The times stay those of the configured house: there is no per-user
+  location.

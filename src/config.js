@@ -1,45 +1,111 @@
 // -----------------------------------------------------------------------------
 // Integration configuration.
 //
-// The configuration is filled in by the user in Gladys, from the `config_schema`
-// declared in `gladys-assistant-integration.json`. The SDK fetches it for you
-// (`gladys.getConfig()`) and notifies you of every change through
-// `gladys.onConfigUpdated()`.
-//
-// This module only provides defaults and normalizes the received object, so the
-// rest of the code never has to deal with `undefined`.
+// Filled in by the user from the `config_schema` of
+// `gladys-assistant-integration.json`. This module holds the defaults (they
+// MUST match the manifest `default` values, see test/manifest.test.js) and
+// turns the received object into checked, typed values, so the rest of the
+// code never deals with an empty string or an out-of-range number.
 // -----------------------------------------------------------------------------
 
-// Defaults: they MUST stay consistent with the `default` values declared in the
-// `config_schema` of the manifest.
+import { METHOD_KEYS } from './prayer/methods.js';
+import { HIGH_LATITUDE_RULES, MIDNIGHT_MODES } from './prayer/calc.js';
+
+export const LANGUAGES = ['en', 'fr', 'de', 'es'];
+
+// The times a user can shift by a few minutes, to match a mosque timetable.
+export const ADJUSTABLE = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+export const MAX_ADJUSTMENT = 60;
+
 export const DEFAULT_CONFIG = {
-  latitude: 48.8566, // Paris
-  longitude: 2.3522,
-  unit: 'celsius', // 'celsius' | 'fahrenheit'
-  // Seconds between two reads of the polled sensors. Gladys polls at most once
-  // a minute: slower intervals are applied by skipping polls (see
-  // createPoller in src/devices/index.js).
-  poll_frequency: 300,
-  // Reserved key (NOT in config_schema): because the manifest declares both
-  // 'local' and 'cloud' in its `transports` field, Gladys shows a standard
-  // "Prefer the local connection" toggle and sends the user's choice here.
-  // Read-only for the integration; defaults to true.
-  GLADYS_PREFER_LOCAL: true,
+  // Empty: the first Gladys house with coordinates.
+  house: '',
+  // Typed coordinates (strings: the number fields of Gladys accept integers only).
+  latitude: '',
+  longitude: '',
+  method: 'mwl',
+  school: 'shafi',
+  high_latitude_rule: 'angle_based',
+  // 'auto': the method's own convention (Jafari for the Shia methods).
+  midnight_mode: 'auto',
+  custom_fajr_angle: '18',
+  custom_isha_angle: '17',
+  custom_isha_minutes: 0,
+  imsak_minutes: 10,
+  adjust_fajr: 0,
+  adjust_sunrise: 0,
+  adjust_dhuhr: 0,
+  adjust_asr: 0,
+  adjust_maghrib: 0,
+  adjust_isha: 0,
+  language: 'fr',
 };
 
 /**
- * Merge the user config with the defaults.
+ * A decimal typed by hand: "48.85", "48,85" or a number.
+ * @returns {number|null} null when empty or not a number
+ */
+export function parseDecimal(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null;
+  }
+  const text = value.trim().replace(',', '.');
+  if (!/^[-+]?\d+(\.\d+)?$/.test(text)) {
+    return null;
+  }
+  return Number(text);
+}
+
+const oneOf = (value, allowed, fallback) => (allowed.includes(value) ? value : fallback);
+
+function integerIn(value, min, max, fallback) {
+  const number = Number(value);
+  if (value === '' || value === null || value === undefined || !Number.isFinite(number)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, Math.round(number)));
+}
+
+function decimalIn(value, min, max, fallback) {
+  const number = parseDecimal(value);
+  return number === null || number < min || number > max ? fallback : number;
+}
+
+/**
+ * Merge the user config with the defaults, and check every value.
  * @param {Record<string, unknown>} raw config returned by the SDK
  */
 export function normalizeConfig(raw = {}) {
-  return {
-    ...DEFAULT_CONFIG,
-    ...raw,
-    // Force the types: config may arrive as strings from a form.
-    latitude: Number(raw.latitude ?? DEFAULT_CONFIG.latitude),
-    longitude: Number(raw.longitude ?? DEFAULT_CONFIG.longitude),
-    poll_frequency: Number(raw.poll_frequency ?? DEFAULT_CONFIG.poll_frequency),
-    // The preference is a boolean; anything but an explicit false means true.
-    GLADYS_PREFER_LOCAL: raw.GLADYS_PREFER_LOCAL !== false,
+  const latitude = decimalIn(raw.latitude, -90, 90, null);
+  const longitude = decimalIn(raw.longitude, -180, 180, null);
+  const config = {
+    house: typeof raw.house === 'string' ? raw.house : DEFAULT_CONFIG.house,
+    // Both or none: a single coordinate is no location.
+    latitude: latitude !== null && longitude !== null ? latitude : null,
+    longitude: latitude !== null && longitude !== null ? longitude : null,
+    method: oneOf(raw.method, METHOD_KEYS, DEFAULT_CONFIG.method),
+    school: oneOf(raw.school, ['shafi', 'hanafi'], DEFAULT_CONFIG.school),
+    high_latitude_rule: oneOf(
+      raw.high_latitude_rule,
+      HIGH_LATITUDE_RULES,
+      DEFAULT_CONFIG.high_latitude_rule,
+    ),
+    midnight_mode: oneOf(
+      raw.midnight_mode,
+      ['auto', ...MIDNIGHT_MODES],
+      DEFAULT_CONFIG.midnight_mode,
+    ),
+    custom_fajr_angle: decimalIn(raw.custom_fajr_angle, 1, 30, 18),
+    custom_isha_angle: decimalIn(raw.custom_isha_angle, 1, 30, 17),
+    custom_isha_minutes: integerIn(raw.custom_isha_minutes, 0, 180, 0),
+    imsak_minutes: integerIn(raw.imsak_minutes, 0, 60, DEFAULT_CONFIG.imsak_minutes),
+    language: oneOf(raw.language, LANGUAGES, DEFAULT_CONFIG.language),
   };
+  for (const key of ADJUSTABLE) {
+    config[`adjust_${key}`] = integerIn(raw[`adjust_${key}`], -MAX_ADJUSTMENT, MAX_ADJUSTMENT, 0);
+  }
+  return config;
 }
