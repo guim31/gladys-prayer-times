@@ -1,6 +1,6 @@
 {
   "name": "gladys-prayer-times",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Gladys Assistant integration: the five daily prayer times for your home, computed locally, with scene triggers and a dashboard widget.",
   "type": "module",
